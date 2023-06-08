@@ -1,4 +1,3 @@
-
 import asyncio
 
 from aiogram.dispatcher import FSMContext
@@ -24,6 +23,7 @@ async def cm_start(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['ls'] = 0
         data['result'] = 0
+        data['incorrect'] = {}
 
     await show_poll(message, state)
 
@@ -53,7 +53,29 @@ async def show_poll(message: types.Message, state: FSMContext):
     else:
         async with state.proxy() as data:
             result = data['result']
-        await bot.send_message(message.from_user.id, f"Опрос завершен. {result}")
+            text = ''
+            for i in data['incorrect']:
+                for k, v in data['incorrect'][i].items():
+                    if k == 'question':
+                        text += f'{v}\n'
+                    else:
+                        text += f'{k}: {v}\n'
+                text += '\n\n'
+            level = (result/55)*100
+            if 0 <= level < 37:
+                res = 'Beginner'
+            elif 37 <= level < 55:
+                res = 'Elementary'
+            elif 55 <= level < 73:
+                res = 'Pre Intermediate'
+            elif 73 <= level < 100:
+                res = 'Intermediate'
+
+        await bot.send_message(message.from_user.id, f"Опрос завершен. \n{result} правильных из 55\nВаш уровень {res.upper()}")
+        await bot.send_message(message.from_user.id, f"\n\nОтчет по неправильным:\n")
+        for i in text.split('\n\n'):
+            if i.strip():
+                await bot.send_message(message.from_user.id, f"{i}")
         await state.finish()
 
 
@@ -63,6 +85,11 @@ async def process_poll_answer(callback_query: types.CallbackQuery, state: FSMCon
         correct_answer = quiz_test.quiz_test[ls]['correct_answer']
         if str(correct_answer) == callback_query.data.replace("answer_", ""):
             data['result'] += 1
+        else:
+            data['incorrect'][ls] = {}
+            data['incorrect'][ls]['question'] = quiz_test.quiz_test[ls]["question"]
+            data['incorrect'][ls]['correct answer'] = quiz_test.quiz_test[ls]["options"][int(correct_answer)]
+            data['incorrect'][ls]['your answer'] = quiz_test.quiz_test[ls]["options"][int(callback_query.data.replace("answer_", ""))]
     await show_poll(callback_query, state)
 
 
